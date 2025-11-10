@@ -1,3 +1,183 @@
+# 📋 TODO List - Módulo de Mensageria
+
+## 🏗️ Fase 1: Estrutura Base (Fundação)
+
+### 1. ✅ Estrutura do Módulo
+- [ ] Criar pasta `src/messaging/`
+- [ ] Criar subpastas: `interfaces/`, `adapters/`, `services/`, `controllers/`, `dto/`, `entities/`
+- [ ] Criar `messaging.module.ts` com imports necessários
+
+### 2. ✅ Interfaces dos Repository Adapters
+- [ ] Criar `interfaces/IWhatsAppAdapter.ts` com métodos: `send()`, `getStatus()`, `validateCredentials()`
+- [ ] Criar `interfaces/IEmailAdapter.ts` com métodos similares + suporte a anexos
+- [ ] Criar `interfaces/ISmsAdapter.ts` com métodos básicos de envio
+- [ ] Criar `interfaces/IMessengerAdapter.ts` com métodos do Facebook API
+- [ ] Criar interface base `IMessageAdapter` com métodos comuns
+
+### 3. ✅ DTOs e Validações
+- [ ] Criar `dto/send-whatsapp.dto.ts` (to, message, mediaUrl?, mediaType?)
+- [ ] Criar `dto/send-email.dto.ts` (to, subject, body, html?, attachments?)
+- [ ] Criar `dto/send-sms.dto.ts` (to, message)
+- [ ] Criar `dto/send-messenger.dto.ts` (recipientId, message, quickReplies?)
+- [ ] Criar `dto/message-response.dto.ts` (id, status, timestamp, provider)
+
+### 4. ✅ Entidades do Banco de Dados
+- [ ] Criar `entities/message.entity.ts` (id, type, recipient, content, status, providerId, userId, createdAt)
+- [ ] Criar `entities/message-log.entity.ts` (id, messageId, event, details, timestamp)
+- [ ] Adicionar migrations com TypeORM
+
+## 🔌 Fase 2: Implementação dos Adapters
+
+### 5. 📱 WhatsApp Adapter (Z-API)
+- [ ] Instalar dependência: `npm install axios`
+- [ ] Criar `adapters/whatsapp/zapi-whatsapp.adapter.ts`
+- [ ] Implementar método `send()` para texto
+- [ ] Implementar envio de imagens
+- [ ] Implementar envio de documentos
+- [ ] Adicionar variáveis no `.env`: `ZAPI_INSTANCE_ID`, `ZAPI_TOKEN`
+- [ ] Criar método `getStatus()` para verificar conexão
+
+### 6. 📧 Email Adapter (Resend)
+- [ ] Instalar: `npm install resend`
+- [ ] Criar `adapters/email/resend-email.adapter.ts`
+- [ ] Implementar envio de email simples
+- [ ] Implementar suporte a HTML
+- [ ] Implementar suporte a anexos
+- [ ] Adicionar variável: `RESEND_API_KEY`
+
+### 7. 💬 SMS Adapter (TotalVoice)
+- [ ] Instalar: `npm install totalvoice-node` ou usar `axios`
+- [ ] Criar `adapters/sms/totalvoice-sms.adapter.ts`
+- [ ] Implementar envio básico de SMS
+- [ ] Adicionar variáveis: `TOTALVOICE_ACCESS_TOKEN`
+
+### 8. 📲 Messenger Adapter (Facebook Graph API)
+- [ ] Instalar: `npm install axios`
+- [ ] Criar `adapters/messenger/facebook-messenger.adapter.ts`
+- [ ] Implementar envio de mensagem via Graph API
+- [ ] Implementar suporte a quick replies e botões
+- [ ] Adicionar variáveis: `FACEBOOK_PAGE_ACCESS_TOKEN`, `FACEBOOK_VERIFY_TOKEN`
+
+## 🎯 Fase 3: Camada de Serviços
+
+### 9. 🏭 Serviço Unificado de Mensageria
+- [ ] Criar `messaging.service.ts`
+- [ ] Implementar injeção de dependência para todos os adapters
+- [ ] Criar factory pattern para selecionar adapter correto
+- [ ] Implementar método `sendWhatsApp(dto)`
+- [ ] Implementar método `sendEmail(dto)`
+- [ ] Implementar método `sendSms(dto)`
+- [ ] Implementar método `sendMessenger(dto)`
+- [ ] Salvar todas as mensagens no banco de dados
+- [ ] Adicionar logs com Winston/Pino
+
+### 10. 🎮 Controller de Mensagens
+- [ ] Criar `messaging.controller.ts`
+- [ ] Criar endpoint `POST /api/messages/whatsapp` (protegido com JWT)
+- [ ] Criar endpoint `POST /api/messages/email` (protegido com JWT)
+- [ ] Criar endpoint `POST /api/messages/sms` (protegido com JWT)
+- [ ] Criar endpoint `POST /api/messages/messenger` (protegido com JWT)
+- [ ] Criar endpoint `GET /api/messages/history` (listagem com paginação)
+- [ ] Criar endpoint `GET /api/messages/:id` (detalhes de uma mensagem)
+
+## ⚡ Fase 4: Processamento Assíncrono
+
+### 11. 🔄 Sistema de Filas (BullMQ + Redis)
+- [ ] Instalar: `npm install @nestjs/bull bullmq ioredis`
+- [ ] Configurar Redis (Docker ou local)
+- [ ] Criar fila `whatsapp-queue`
+- [ ] Criar fila `email-queue`
+- [ ] Criar fila `sms-queue`
+- [ ] Criar fila `messenger-queue`
+- [ ] Criar processors para cada fila
+- [ ] Implementar jobs com retry automático
+
+### 12. 🛡️ Tratamento de Erros e Resiliência
+- [ ] Implementar retry automático (3 tentativas)
+- [ ] Implementar circuit breaker para APIs externas
+- [ ] Criar logs detalhados de erros
+- [ ] Implementar fallback para provedores alternativos
+- [ ] Adicionar timeout nas requisições (30s)
+
+## ✅ Fase 5: Testes
+
+### 13. 🧪 Testes Unitários dos Adapters
+- [ ] Testar `ZApiWhatsAppAdapter` com API mockada
+- [ ] Testar `ResendEmailAdapter` com API mockada
+- [ ] Testar `TotalVoiceSmsAdapter` com API mockada
+- [ ] Testar `FacebookMessengerAdapter` com API mockada
+- [ ] Testar validações dos DTOs
+
+### 14. 🔬 Testes E2E
+- [ ] Testar fluxo completo de envio via WhatsApp
+- [ ] Testar fluxo completo de envio via Email
+- [ ] Testar autenticação nos endpoints
+- [ ] Testar cenários de erro (credenciais inválidas, timeout, etc)
+
+## 📚 Fase 6: Documentação e Features Extras
+
+### 15. 📖 Documentação Swagger
+- [ ] Adicionar `@ApiTags('Messaging')` no controller
+- [ ] Documentar todos os endpoints com `@ApiOperation`
+- [ ] Adicionar exemplos de request/response
+- [ ] Documentar códigos de erro possíveis
+
+### 16. 📝 Sistema de Templates
+- [ ] Criar entidade `MessageTemplate`
+- [ ] Permitir variáveis dinâmicas: `{{nome}}`, `{{data}}`, etc
+- [ ] Criar endpoint para gerenciar templates
+- [ ] Implementar parse de templates antes do envio
+
+### 17. 🔔 Webhooks para Status de Entrega
+- [ ] Criar endpoint `POST /api/webhooks/whatsapp/status`
+- [ ] Criar endpoint `POST /api/webhooks/email/status`
+- [ ] Atualizar status da mensagem no banco (entregue, lido, falhou)
+- [ ] Registrar eventos no `MessageLog`
+
+### 18. 🚦 Rate Limiting
+- [ ] Instalar: `npm install @nestjs/throttler`
+- [ ] Configurar limite por usuário (ex: 100 msg/hora)
+- [ ] Configurar limite global (ex: 1000 msg/hora)
+- [ ] Criar sistema de cotas por plano de usuário
+
+### 19. 📊 Dashboard de Estatísticas
+- [ ] Criar endpoint `GET /api/messages/stats`
+- [ ] Retornar: total enviado, taxa de sucesso, falhas
+- [ ] Agrupar por canal (WhatsApp, Email, SMS, Messenger)
+- [ ] Adicionar filtros por período (hoje, semana, mês)
+- [ ] Calcular custos estimados por canal
+
+### 20. 📄 Documentação Final
+- [ ] Criar `MESSAGING.md` com guia completo
+- [ ] Documentar como trocar de provedor
+- [ ] Adicionar exemplos de uso de cada adapter
+- [ ] Documentar variáveis de ambiente necessárias
+- [ ] Criar guia de troubleshooting
+
+---
+
+## 🎯 Prioridade de Execução Sugerida:
+
+1. **CRÍTICO** (Fazer primeiro): Fases 1, 2, 3
+2. **IMPORTANTE**: Fases 4, 5
+3. **DESEJÁVEL**: Fase 6
+
+## 🛠️ Dependências Necessárias:
+
+```bash
+# Instalar todas de uma vez
+npm install axios resend ioredis @nestjs/bull bullmq @nestjs/throttler
+```
+
+## 📐 Arquitetura de Repository Adapter - Benefícios:
+
+✅ **Desacoplamento**: Troca de provedor sem alterar lógica de negócio  
+✅ **Testabilidade**: Fácil criar mocks dos adapters  
+✅ **Escalabilidade**: Adicionar novos canais sem modificar código existente  
+✅ **Manutenibilidade**: Cada adapter é independente  
+✅ **Flexibilidade**: Usar múltiplos provedores simultaneamente (fallback)
+
+---
 
 # Endpoints Disponíveis
 

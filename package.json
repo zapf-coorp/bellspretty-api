@@ -25,7 +25,9 @@
     "migration:revert": "npm run build && npx typeorm migration:revert -d dist/ormconfig.js",
     "migration:show": "npm run build && npx typeorm migration:show -d dist/ormconfig.js",
     "schema:sync": "npm run build && npx typeorm schema:sync -d dist/ormconfig.js",
-    "schema:drop": "npm run build && npx typeorm schema:drop -d dist/ormconfig.js"
+    "schema:drop": "npm run build && npx typeorm schema:drop -d dist/ormconfig.js",
+    "schema:log": "npm run build && npx typeorm schema:log -d dist/ormconfig.js",
+    "schema:show": "npm run build && ts-node scripts/show-schema.ts"
   },
   "dependencies": {
     "@nestjs/common": "^10.0.0",

@@ -2,6 +2,16 @@
 
 A API BellsPretty está configurada para usar diferentes bancos de dados baseados no ambiente:
 
+## 📚 Documentação Relacionada
+
+| Documento | Descrição |
+|-----------|-----------|
+| **[DATABASE_SCHEMA.md](DATABASE_SCHEMA.md)** | 📊 Documentação visual completa do schema com diagramas ER, tabelas, relacionamentos e queries |
+| **[docs/schema.sql](docs/schema.sql)** | 📄 Schema SQL completo para importação e referência |
+| **[docs/README.md](docs/README.md)** | 📚 Índice da documentação técnica |
+
+---
+
 ## 🗄️ Configuração por Ambiente
 
 ### **Desenvolvimento** (`NODE_ENV=development` ou não definido)
