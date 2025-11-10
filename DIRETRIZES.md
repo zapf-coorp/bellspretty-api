@@ -1,5 +1,146 @@
 # 📋 TODO List - Módulo de Mensageria
 
+## 🧾 Schema: Users (Lista de Tarefas)
+
+Checklist para definir e implementar o schema `users` de forma clara e implementável.
+
+### A. Design e Especificação
+- [ ] Campos principais:
+  - `id` UUID PK
+  - `name` VARCHAR(100) NOT NULL
+  - `email` VARCHAR(255) UNIQUE NOT NULL
+  - `password` VARCHAR(255) NOT NULL (armazenar hashed)
+  - `phone` VARCHAR(20) NULLABLE
+  - `global_role` ENUM('super_admin','user') DEFAULT 'user'
+  - `is_active` BOOLEAN DEFAULT TRUE
+  - `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+  - `updated_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+- [ ] Constraints/Checks: email format, optional CHECK para `global_role`
+- [ ] Índices: UNIQUE(email), INDEX(global_role), INDEX(is_active)
+- [ ] Políticas de deleção: definir soft-delete via `is_active` ou `deleted_at` (recomendado soft-delete)
+
+### B. TypeORM Entity + Mapping
+- [ ] Criar/validar `src/entities/user.entity.ts` com colunas em snake_case e mapeamentos:
+  - OneToMany -> `RefreshToken`
+  - OneToMany -> `UserSalonRole`
+  - OneToMany -> `Appointment` (client) e (worker)
+  - OneToMany -> `Message` (recipient/sender se aplicável)
+- [ ] Aplicar `@Index`, `@Unique` e `@BeforeInsert` para normalizações (ex.: lower(email))
+- [ ] Não expor `password` em toJSON/serializers (use transformer/exclude)
+
+### C. Migrations
+- [ ] Gerar migration: `npm run migration:generate -- --name=CreateOrUpdateUsers` e revisar SQL
+- [ ] Implementar up/down idempotentes
+- [ ] Se migrando de schema antigo, criar migration para migração de dados (normalizar emails, preencher `global_role`)
+
+### D. Seeds e Dados de Desenvolvimento
+- [ ] Seed para roles (já presente) e seed para um `super_admin` (usar password hashed de dev)
+- [ ] Adicionar `docs/seeds/seed_users.sql` ou `scripts/seed-users.ts` com dados de exemplo (idempotente)
+
+### E. DTOs e Validações (class-validator)
+- [ ] `src/modules/users/dto/register-user.dto.ts` — name, email, password (validations)
+- [ ] `src/modules/users/dto/login.dto.ts` — email, password
+- [ ] `src/modules/users/dto/update-user.dto.ts` — PartialType para campos editáveis
+- [ ] `src/modules/users/dto/paginate-users.dto.ts` — page, limit, filters
+
+### F. Service, Controller e Endpoints
+- [ ] Criar `UsersModule`, `UsersService`, `UsersController` (se não existirem)
+- [ ] Endpoints recomendados:
+  - POST /api/auth/register — registrar
+  - POST /api/auth/login — autenticar
+  - GET  /api/auth/profile — obter perfil (auth)
+  - GET  /api/users — listar (admin)
+  - GET  /api/users/:id — detalhes (owner/admin)
+  - PUT  /api/users/:id — atualizar (owner/admin)
+  - PATCH /api/users/:id/deactivate — desativar (soft-delete)
+  - DELETE /api/users/:id — remover permanentemente (restrito)
+- [ ] Garantir que `password` nunca seja retornado
+
+### G. Segurança e Operações Sensíveis
+- [ ] Hash de senha com `bcrypt` (saltRounds >= 10) no serviço antes de persistir
+- [ ] Rate-limit para endpoints sensíveis (login/register)
+- [ ] Implementar lockout/monitoramento de tentativas de login
+- [ ] Uso seguro de tokens (rotacionamento de refresh tokens já existente)
+
+### H. Tests
+- [ ] Unit tests para `UsersService` (criar, atualizar, autenticar, desativar)
+- [ ] E2E tests para registro/login/profile
+- [ ] Testar migrations up/down em SQLite em memória
+
+### I. Documentação e Swagger
+- [ ] Documentar DTOs e endpoints com `@ApiTags('Users')` e `@ApiOperation`
+- [ ] Atualizar `DIRETRIZES.md` com links para migrations e seeds geradas
+
+### J. Checklist de Aceitação
+- [ ] Migration aplicada em dev sem erros
+- [ ] Endpoints de autenticação funcionando com tokens e refresh
+- [ ] Testes unitários e e2e para os fluxos críticos passando
+- [ ] Documentação atualizada (README / DIRETRIZES)
+
+
+## 🧾 Schema: Roles (Lista de Tarefas)
+
+Checklist para definir e implementar o schema `roles` (papéis do sistema e integração RBAC).
+
+### A. Design e Especificação
+- [ ] Campos principais:
+  - `id` UUID PK
+  - `name` VARCHAR(50) UNIQUE NOT NULL (ex.: owner, admin, worker, client)
+  - `description` TEXT NULLABLE
+  - `scope` ENUM('global','salon') DEFAULT 'salon'  # indica se é um papel global ou específico de salão
+  - `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+  - `updated_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+- [ ] Constraints/checks: UNIQUE(name), optional CHECK para `scope`
+- [ ] Índices: UNIQUE(name), INDEX(scope)
+
+### B. TypeORM Entity + Mapping
+- [ ] Criar/validar `src/entities/role.entity.ts` com colunas snake_case e relacionamentos:
+  - OneToMany -> `UserSalonRole` (pivot)
+  - (Opcional) ManyToMany -> `User` via pivot para consultas simplificadas
+- [ ] Garantir serialização segura (não expor dados que não devam sair via API)
+
+### C. Migrations
+- [ ] Gerar migration: `npm run migration:generate -- --name=CreateOrUpdateRoles` e revisar SQL
+- [ ] Implementar up/down idempotentes
+- [ ] Se houver roles pré-existentes, criar migration para mapear/migrar valores antigos para o novo modelo
+
+### D. Seeds e Dados de Desenvolvimento
+- [ ] Seed idempotente para papéis padrão: `owner`, `admin`, `worker`, `client` (usar ON CONFLICT/INSERT OR IGNORE)
+- [ ] Atualizar `docs/seeds/seed_roles.sql` e `scripts/seed-roles.ts` se necessário (IDs previsíveis para testes)
+
+### E. Integração RBAC / Políticas
+- [ ] Documentar distinção entre `global_role` em `users` (super_admin) e `roles` por salão
+- [ ] Implementar helpers/utilitários: `hasGlobalRole(user, roles[])`, `hasSalonRole(user, salonId, roles[])`
+- [ ] Atualizar Guards/Policies para usar a nova `roles` table + pivot `user_salon_roles`
+
+### F. Endpoints e Administração
+- [ ] Endpoints recomendados (protegidos por `super_admin` / admin):
+  - GET  /api/roles — listar
+  - POST /api/roles — criar
+  - PUT  /api/roles/:id — atualizar
+  - DELETE /api/roles/:id — remover (cautela)
+  - (Admin UI/API) atribuir roles por salão via pivot endpoints (já previstos em user_salon_roles checklist)
+- [ ] Validar que remoção de role com referências falhe / exija migração antes
+
+### G. Segurança e Consistência
+- [ ] Proteger operações destrutivas (remoção/alteração de roles críticos)
+- [ ] Quando renomear roles, prover migration que atualize referências no pivot
+
+### H. Tests
+- [ ] Unit tests para `RoleService` (criar, listar, atualizar, remover)
+- [ ] Integration tests para APIs administrativas e interação com `user_salon_roles`
+- [ ] E2E tests cobrindo atribuição e verificação de permissões
+
+### I. Documentação e Swagger
+- [ ] Documentar endpoints em Swagger (`@ApiTags('Roles')`)
+- [ ] Adicionar exemplos para: criação, atribuição, revogação e verificação de permissões
+
+### J. Checklist de Aceitação
+- [ ] Roles padrão seedadas e visíveis via API
+- [ ] Atribuição/revocação via pivot funciona com checks de permissão
+- [ ] Testes críticos verdes e documentação atualizada
+
+
 ## 🏗️ Fase 1: Estrutura Base (Fundação)
 
 ### 1. ✅ Estrutura do Módulo
@@ -155,6 +296,7 @@
 - [ ] Criar guia de troubleshooting
 
 ---
+
 
 ## 🎯 Prioridade de Execução Sugerida:
 
