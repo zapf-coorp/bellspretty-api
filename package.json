@@ -27,7 +27,8 @@
     "schema:sync": "npm run build && npx typeorm schema:sync -d dist/ormconfig.js",
     "schema:drop": "npm run build && npx typeorm schema:drop -d dist/ormconfig.js",
     "schema:log": "npm run build && npx typeorm schema:log -d dist/ormconfig.js",
-    "schema:show": "npm run build && ts-node scripts/show-schema.ts"
+    "schema:show": "npm run build && ts-node scripts/show-schema.ts",
+    "db:show": "node scripts/show-db.js"
   },
   "dependencies": {
     "@nestjs/common": "^10.0.0",

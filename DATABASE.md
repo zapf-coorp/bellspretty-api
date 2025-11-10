@@ -69,15 +69,21 @@ DB_SSL=true
 ## 📊 Scripts Disponíveis
 
 ```bash
+# Visualização do Schema
+npm run schema:show    # Visualização completa via TypeORM (mais detalhada)
+npm run schema:log     # Log do schema SQL que seria gerado
+npm run db:show        # Visualização direta do SQLite (mais rápida)
+
 # Migrações
 npm run migration:generate -- --name=CreateUsers
 npm run migration:create -- --name=AddIndexes
 npm run migration:run
 npm run migration:revert
+npm run migration:show
 
-# Schema (apenas desenvolvimento)
-npm run schema:sync
-npm run schema:drop
+# Schema (apenas desenvolvimento - USE COM CUIDADO!)
+npm run schema:sync    # Sincroniza schema com entidades
+npm run schema:drop    # Apaga todas as tabelas
 
 # TypeORM CLI
 npm run typeorm -- --help
