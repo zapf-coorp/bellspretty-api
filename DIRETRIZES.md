@@ -308,4 +308,3 @@ npm run test:cov        # Cobertura de testes
 
 **🌐 Servidor Local**: http://localhost:3000  
 **📖 Documentação**: http://localhost:3000/api/docs
-

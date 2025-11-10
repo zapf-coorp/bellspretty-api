@@ -1,0 +1,1 @@
+This summary file has been deprecated. The canonical schema documentation is `DATABASE_SCHEMA_NEW.md` and the SQL DDL is in `docs/schema_v2.sql`.

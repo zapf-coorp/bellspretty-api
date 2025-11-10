@@ -1,9 +1,9 @@
--- =====================================================
--- BellsPretty API - Database Schema
--- Versão: 1.0.0
--- Data: 2025-11-10
--- Descrição: Schema completo do banco de dados
--- =====================================================
+-- Deprecated legacy schema file
+-- This file is deprecated. The canonical schema documentation lives in the repository root:
+--   DATABASE_SCHEMA_NEW.md
+-- and the up-to-date SQL DDL is available at:
+--   docs/schema_v2.sql
+-- We keep a single official schema doc during active design to avoid drift.
 
 -- =====================================================
 -- TABELA: users
