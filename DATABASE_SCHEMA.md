@@ -10,198 +10,180 @@ Sistema de gerenciamento de salões com agendamentos, histórico de serviços/pr
 
 ```mermaid
 erDiagram
-    %% Core Entities
-    USERS ||--o{ REFRESH_TOKENS : "has"
-    USERS ||--o{ USER_SALON_ROLES : "works_in"
-    
-    %% Salon Management
-    SALONS ||--o{ USER_SALON_ROLES : "employs"
-    SALONS ||--o{ SERVICES : "offers"
-    SALONS ||--o{ PRODUCTS : "sells"
-    SALONS ||--o{ APPOINTMENTS : "schedules"
-    SALONS ||--o{ MESSAGES : "sends"
-    
-    %% Appointments
-    APPOINTMENTS }o--|| USERS : "booked_by"
-    APPOINTMENTS ||--o{ APPOINTMENT_SERVICES : "includes"
-    APPOINTMENTS ||--o{ APPOINTMENT_PRODUCTS : "uses"
-    
-    APPOINTMENT_SERVICES }o--|| SERVICES : "references"
-    APPOINTMENT_PRODUCTS }o--|| PRODUCTS : "references"
-    
-    %% Messages
-    MESSAGES }o--|| USERS : "sent_to"
-    
-    %% Roles
-    USER_SALON_ROLES }o--|| ROLES : "has_role"
-    
-    USERS {
-        uuid id PK
-        string name
-        string email UK
-        string password
-        string phone
-        enum globalRole
-        boolean isActive
-        timestamp createdAt
-        timestamp updatedAt
-    }
-    
-    ROLES {
-        uuid id PK
-        string name UK
-        string description
-        timestamp createdAt
-    }
-    
-    SALONS {
-        uuid id PK
-        string name
-        string slug UK
-        string description
-        string address
-        string phone
-        string email
-        uuid ownerUserId FK NULLABLE
-        json businessHours
-        boolean isActive
-        timestamp createdAt
-        timestamp updatedAt
-    }
-    
-    USER_SALON_ROLES {
-        uuid id PK
-        uuid userId FK
-        uuid salonId FK
-        uuid roleId FK
-        timestamp createdAt
-    }
+        USERS ||--o{ REFRESH_TOKENS : has
+        USERS ||--o{ USER_SALON_ROLES : works_in
 
-    ROLES ||--o{ ROLE_PERMISSIONS : "grants"
-    PERMISSIONS ||--o{ ROLE_PERMISSIONS : "used_by"
+        SALONS ||--o{ USER_SALON_ROLES : employs
+        SALONS ||--o{ SERVICES : offers
+        SALONS ||--o{ PRODUCTS : sells
+        SALONS ||--o{ APPOINTMENTS : schedules
+        SALONS ||--o{ MESSAGES : sends
 
-    PERMISSIONS {
-        uuid id PK
-        string name UK
-        string description
-        enum scope
-        timestamp createdAt
-        timestamp updatedAt
-    }
+        APPOINTMENTS }o--|| USERS : booked_by
+        APPOINTMENTS ||--o{ APPOINTMENT_SERVICES : includes
+        APPOINTMENTS ||--o{ APPOINTMENT_PRODUCTS : uses
 
-    ROLE_PERMISSIONS {
-        uuid id PK
-        uuid roleId FK
-        uuid permissionId FK
-        timestamp createdAt
-    }
+        APPOINTMENT_SERVICES }o--|| SERVICES : references
+        APPOINTMENT_PRODUCTS }o--|| PRODUCTS : references
 
-    ROLES ||--o{ SERVICE_ROLES : "qualifies"
-    SERVICES ||--o{ SERVICE_ROLES : "requires"
+        MESSAGES }o--|| USERS : sent_to
 
-    SERVICE_ROLES {
-        uuid id PK
-        uuid serviceId FK
-        uuid roleId FK
-        timestamp createdAt
-    }
-    
-    SERVICES {
-        uuid id PK
-        uuid salonId FK
-        string name
-        string description
-        decimal price
-        int durationMinutes
-        boolean isActive
-        string imageUrl NULLABLE
-        uuid imageId NULLABLE
-        timestamp createdAt
-        timestamp updatedAt
-    }
-    
-    PRODUCTS {
-        uuid id PK
-        uuid salonId FK
-        string name
-        string description
-        string brand
-        decimal price
-        string productCode UK NULLABLE
-        int stockQuantity
-        boolean isActive
-        string imageUrl NULLABLE
-        uuid imageId NULLABLE
-        timestamp createdAt
-        timestamp updatedAt
-    }
-    
-    APPOINTMENTS {
-        uuid id PK
-        uuid salonId FK
-        uuid clientId FK
-        uuid workerId FK
-        datetime scheduledAt
-        int totalDurationMinutes
-        decimal totalPrice
-        decimal totalCost
-        enum status
-        text notes
-        timestamp createdAt
-        timestamp updatedAt
-    }
+        USER_SALON_ROLES }o--|| ROLES : has_role
 
-%% Notes on foreign keys & inventory
-%% Recommended FK policies:
-%%   * clientId: ON DELETE RESTRICT  -- keep history intact for reporting; change to SET NULL only if deleting clients is allowed and history can drop client linkage
-%%   * workerId: ON DELETE SET NULL  -- recommended so removing a worker doesn't block historical appointments; use RESTRICT if strict traceability is required
+        USERS {
+            string id
+            string name
+            string email
+            string password
+            string phone
+            string globalRole
+            boolean isActive
+            string createdAt
+            string updatedAt
+        }
 
-%% Inventory & stock rules (operational guidance):
-%%   * Decrement product stock on a controlled status transition (example: when appointment.status transitions to 'confirmed' or 'in_progress').
-%%   * Rollback (increment) stock if appointment transitions to 'cancelled' (and only if stock was previously decremented for that appointment).
-%%   * Implement idempotent stock operations (mark appointment row with flag or record in journal when stock was applied) to avoid double-decrements.
-    
-    APPOINTMENT_SERVICES {
-        uuid id PK
-        uuid appointmentId FK
-        uuid serviceId FK
-        decimal price
-        int durationMinutes
-    }
-    
-    APPOINTMENT_PRODUCTS {
-        uuid id PK
-        uuid appointmentId FK
-        uuid productId FK
-        int quantity
-        decimal unitPrice
-        decimal totalPrice
-    }
-    
-    MESSAGES {
-        uuid id PK
-        uuid salonId FK
-        uuid recipientId FK
-        string recipientEmail NULLABLE
-        string recipientPhone NULLABLE
-        enum type
-        string subject
-        text content
-        enum status
-        json metadata
-        datetime scheduledFor
-        datetime sentAt
-        timestamp createdAt
-    }
-    
-    REFRESH_TOKENS {
-        uuid id PK
-        uuid userId FK
-        string token UK
-        datetime expiresAt
-        boolean isRevoked
-        timestamp createdAt
-    }
+        ROLES {
+            string id
+            string name
+            string description
+            string createdAt
+        }
+
+        SALONS {
+            string id
+            string name
+            string slug
+            string description
+            string address
+            string phone
+            string email
+            string ownerUserId
+            string businessHours
+            boolean isActive
+            string createdAt
+            string updatedAt
+        }
+
+        USER_SALON_ROLES {
+            string id
+            string userId
+            string salonId
+            string roleId
+            string createdAt
+        }
+
+        PERMISSIONS ||--o{ ROLE_PERMISSIONS : used_by
+        ROLES ||--o{ ROLE_PERMISSIONS : grants
+
+        PERMISSIONS {
+            string id
+            string name
+            string description
+            string scope
+            string createdAt
+            string updatedAt
+        }
+
+        ROLE_PERMISSIONS {
+            string id
+            string roleId
+            string permissionId
+            string createdAt
+        }
+
+        SERVICE_ROLES {
+            string id
+            string serviceId
+            string roleId
+            string createdAt
+        }
+
+        SERVICES {
+            string id
+            string salonId
+            string name
+            string description
+            number price
+            int durationMinutes
+            boolean isActive
+            string imageUrl
+            string imageId
+            string createdAt
+            string updatedAt
+        }
+
+        PRODUCTS {
+            string id
+            string salonId
+            string name
+            string description
+            string brand
+            number price
+            string productCode
+            int stockQuantity
+            boolean isActive
+            string imageUrl
+            string imageId
+            string createdAt
+            string updatedAt
+        }
+
+        APPOINTMENTS {
+            string id
+            string salonId
+            string clientId
+            string workerId
+            string scheduledAt
+            int totalDurationMinutes
+            number totalPrice
+            number totalCost
+            string status
+            string notes
+            string createdAt
+            string updatedAt
+        }
+
+        APPOINTMENT_SERVICES {
+            string id
+            string appointmentId
+            string serviceId
+            number price
+            int durationMinutes
+        }
+
+        APPOINTMENT_PRODUCTS {
+            string id
+            string appointmentId
+            string productId
+            int quantity
+            number unitPrice
+            number totalPrice
+        }
+
+        MESSAGES {
+            string id
+            string salonId
+            string recipientId
+            string recipientEmail
+            string recipientPhone
+            string type
+            string subject
+            string content
+            string status
+            string metadata
+            string scheduledFor
+            string sentAt
+            string createdAt
+        }
+
+        REFRESH_TOKENS {
+            string id
+            string userId
+            string token
+            string expiresAt
+            boolean isRevoked
+            string createdAt
+        }
 ```
 
 ---
