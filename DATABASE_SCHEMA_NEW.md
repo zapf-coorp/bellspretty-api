@@ -62,7 +62,7 @@ erDiagram
         string address
         string phone
         string email
-        uuid ownerUserId FK NULLABLE
+    uuid owner_user_id FK -> users.id NULLABLE
         json businessHours
         boolean isActive
         timestamp createdAt

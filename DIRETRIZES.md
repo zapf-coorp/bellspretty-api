@@ -152,18 +152,20 @@ Checklist para a tabela `permissions` e pivot `role_permissions`, que implementa
 ### A. Design e Especificação
 - [ ] Tabelas principais:
   - `permissions`:
-    - `id` UUID PK
+  - `name` VARCHAR(100) NOT NULL
     - `name` VARCHAR(150) UNIQUE NOT NULL (ex.: `appointments.create`, `salons.manage.settings`)
     - `description` TEXT NULLABLE
     - `scope` ENUM('global','salon') DEFAULT 'salon' # determina se a permissão precisa de contexto de salão
     - `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-    - `updated_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    - `email` VARCHAR(255) NULLABLE
+    - `owner_user_id` UUID FK -> `users.id` NULLABLE  # vincula o salão ao usuário proprietário/criador principal (nullable para migração/remoção)
   - `role_permissions` (pivot):
     - `id` UUID PK
     - `role_id` UUID FK -> `roles.id`
     - `permission_id` UUID FK -> `permissions.id`
     - `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 - [ ] Constraints: `UNIQUE(role_id, permission_id)` para evitar duplicatas
+ - [ ] Índices adicionais: `INDEX(owner_user_id)` para consultas rápidas por proprietário
 - [ ] Índices: `INDEX(name)`, `INDEX(scope)`, `INDEX(role_id)` para consultas rápidas
 
 ### B. TypeORM Entity + Mapping
@@ -299,6 +301,10 @@ Checklist para a tabela `salons`, a entidade central que representa cada salão 
 - [ ] Implementar `Guard` para garantir que apenas `owner` ou `admin` possam modificar dados do salão.
 - [ ] A criação de salões pode ser restrita a `super_admin` ou a um fluxo de onboarding específico.
 - [ ] O `slug` deve ser único e sanitizado para evitar conflitos de URL.
+ - [ ] Uso do campo `owner_user_id`:
+  - Ao verificar se um usuário é `owner` do salão prefira checar `salon.owner_user_id === user.id` (fast path) antes de consultar `user_salon_roles`.
+  - Para consistência, manter também registros em `user_salon_roles` (owner role) — útil para histórico/auditoria; mas primary check pode usar `owner_user_id`.
+  - Definir política de deleção: `ON DELETE SET NULL` (recomendado) — documentar decisão na migration e lidar com caso `owner_user_id IS NULL` (notificar owner transfer needed).
 
 ### H. Tests
 - [ ] Unit tests para `SalonsService` (criar, atualizar, encontrar por slug).
