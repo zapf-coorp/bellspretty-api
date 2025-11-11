@@ -10,6 +10,7 @@ import {
 } from 'typeorm';
 import { Salon } from './salon.entity';
 import { AppointmentService } from './appointment-service.entity';
+import { ServiceRole } from './service-role.entity';
 
 /**
  * Service Entity
@@ -49,6 +50,9 @@ export class Service {
     (appointmentService) => appointmentService.service,
   )
   appointmentServices: AppointmentService[];
+
+  @OneToMany(() => ServiceRole, (serviceRole) => serviceRole.service)
+  serviceRoles: ServiceRole[];
 
   @CreateDateColumn({ name: 'created_at' })
   createdAt: Date;

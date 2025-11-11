@@ -76,6 +76,7 @@ CREATE TABLE user_salon_roles (
     user_id VARCHAR(36) NOT NULL,
     salon_id VARCHAR(36) NOT NULL,
     role_id VARCHAR(36) NOT NULL,
+    is_active BOOLEAN DEFAULT TRUE,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     
     FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
@@ -88,6 +89,43 @@ CREATE TABLE user_salon_roles (
 CREATE INDEX idx_usr_user_salon ON user_salon_roles(user_id, salon_id);
 CREATE INDEX idx_usr_salon_role ON user_salon_roles(salon_id, role_id);
 
+
+-- =====================================================
+-- TABLE: permissions
+-- Description: Granular permissions for RBAC
+-- =====================================================
+
+CREATE TABLE permissions (
+    id VARCHAR(36) PRIMARY KEY,
+    name VARCHAR(150) UNIQUE NOT NULL,
+    description TEXT,
+    scope VARCHAR(20) DEFAULT 'salon' CHECK(scope IN ('global', 'salon')),
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX idx_permissions_name ON permissions(name);
+CREATE INDEX idx_permissions_scope ON permissions(scope);
+
+-- =====================================================
+-- TABLE: role_permissions
+-- Description: Pivot table connecting roles to permissions
+-- =====================================================
+
+CREATE TABLE role_permissions (
+    id VARCHAR(36) PRIMARY KEY,
+    role_id VARCHAR(36) NOT NULL,
+    permission_id VARCHAR(36) NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    
+    FOREIGN KEY (role_id) REFERENCES roles(id) ON DELETE CASCADE,
+    FOREIGN KEY (permission_id) REFERENCES permissions(id) ON DELETE CASCADE,
+    
+    UNIQUE(role_id, permission_id)
+);
+
+CREATE INDEX idx_role_permissions_role ON role_permissions(role_id);
+CREATE INDEX idx_role_permissions_permission ON role_permissions(permission_id);
 
 -- =====================================================
 -- TABLE: services
@@ -231,6 +269,8 @@ CREATE TABLE messages (
     id VARCHAR(36) PRIMARY KEY,
     salon_id VARCHAR(36) NOT NULL,
     recipient_id VARCHAR(36) NOT NULL,
+    recipient_email VARCHAR(255),
+    recipient_phone VARCHAR(20),
     type VARCHAR(20) NOT NULL CHECK(type IN ('whatsapp', 'email', 'sms', 'messenger')),
     subject VARCHAR(255),
     content TEXT NOT NULL,

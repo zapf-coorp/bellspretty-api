@@ -39,6 +39,12 @@ export class Message {
   @Column({ name: 'recipient_id' })
   recipientId: string;
 
+  @Column({ nullable: true, name: 'recipient_email' })
+  recipientEmail: string;
+
+  @Column({ length: 20, nullable: true, name: 'recipient_phone' })
+  recipientPhone: string;
+
   @Column({ type: 'varchar', length: 20 })
   type: MessageType;
 

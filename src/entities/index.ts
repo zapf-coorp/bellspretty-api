@@ -7,6 +7,8 @@
 import { User } from './user.entity';
 import { Role } from './role.entity';
 import { RefreshToken } from './refresh-token.entity';
+import { Permission, PermissionScope } from './permission.entity';
+import { RolePermission } from './role-permission.entity';
 
 // Salon Entities
 import { Salon } from './salon.entity';
@@ -15,6 +17,7 @@ import { UserSalonRole } from './user-salon-role.entity';
 // Catalog Entities
 import { Service } from './service.entity';
 import { Product } from './product.entity';
+import { ServiceRole } from './service-role.entity';
 
 // Appointment Entities
 import { Appointment, AppointmentStatus } from './appointment.entity';
@@ -29,10 +32,14 @@ export {
   User,
   Role,
   RefreshToken,
+  Permission,
+  PermissionScope,
+  RolePermission,
   Salon,
   UserSalonRole,
   Service,
   Product,
+  ServiceRole,
   Appointment,
   AppointmentStatus,
   AppointmentService,
@@ -47,10 +54,13 @@ export const entities = [
   User,
   Role,
   RefreshToken,
+  Permission,
+  RolePermission,
   Salon,
   UserSalonRole,
   Service,
   Product,
+  ServiceRole,
   Appointment,
   AppointmentService,
   AppointmentProduct,

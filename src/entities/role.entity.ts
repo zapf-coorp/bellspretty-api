@@ -6,6 +6,8 @@ import {
   OneToMany,
 } from 'typeorm';
 import { UserSalonRole } from './user-salon-role.entity';
+import { RolePermission } from './role-permission.entity';
+import { ServiceRole } from './service-role.entity';
 
 /**
  * Role Entity
@@ -25,6 +27,12 @@ export class Role {
 
   @OneToMany(() => UserSalonRole, (userSalonRole) => userSalonRole.role)
   userSalonRoles: UserSalonRole[];
+
+  @OneToMany(() => RolePermission, (rolePermission) => rolePermission.role)
+  rolePermissions: RolePermission[];
+
+  @OneToMany(() => ServiceRole, (serviceRole) => serviceRole.role)
+  serviceRoles: ServiceRole[];
 
   @CreateDateColumn({ name: 'created_at' })
   createdAt: Date;
