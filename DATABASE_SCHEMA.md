@@ -76,6 +76,25 @@ erDiagram
         boolean isActive
         timestamp createdAt
     }
+
+    ROLES ||--o{ ROLE_PERMISSIONS : "grants"
+    PERMISSIONS ||--o{ ROLE_PERMISSIONS : "used_by"
+
+    PERMISSIONS {
+        uuid id PK
+        string name UK
+        string description
+        enum scope "global, salon"
+        timestamp createdAt
+        timestamp updatedAt
+    }
+
+    ROLE_PERMISSIONS {
+        uuid id PK
+        uuid roleId FK
+        uuid permissionId FK
+        timestamp createdAt
+    }
     
     SERVICES {
         uuid id PK
@@ -204,6 +223,47 @@ Define os papéis que usuários podem ter dentro de um salão.
 - `admin` - Administrador (gerencia workers e agendamentos)
 - `worker` - Profissional (executa serviços)
 - `client` - Cliente (agenda serviços)
+
+---
+
+### 3. **`permissions`** - Permissões do Sistema
+
+Tabela que define permissões granulares para RBAC (ex.: `appointments.create`, `salons.manage`).
+
+| Coluna | Tipo | Constraints | Descrição |
+|--------|------|-------------|-----------|
+| `id` | UUID | PRIMARY KEY | Identificador único |
+| `name` | VARCHAR(150) | UNIQUE, NOT NULL | Nome canônico da permissão (dot-notation) |
+| `description` | TEXT | NULLABLE | Descrição legível |
+| `scope` | ENUM | DEFAULT 'salon' | 'global' ou 'salon' (se precisa de contexto de salão) |
+| `createdAt` | TIMESTAMP | NOT NULL | Data de criação |
+| `updatedAt` | TIMESTAMP | NOT NULL | Data de atualização |
+
+**Índices:**
+- `UQ_permissions_name`: UNIQUE em `name`
+- `IDX_permissions_scope`: INDEX em `scope`
+
+**Regras:**
+- Permissões definidas como strings canônicas (dot-notation) para facilitar verificação e agrupamento
+- `scope = 'salon'` significa que o verificador de permissão deve receber um `salonId`
+
+---
+
+### 4. **`role_permissions`** - Mapeamento Role ↔ Permission
+
+Pivot que conecta `roles` a `permissions`.
+
+| Coluna | Tipo | Constraints | Descrição |
+|--------|------|-------------|-----------|
+| `id` | UUID | PRIMARY KEY | Identificador único |
+| `roleId` | UUID | FOREIGN KEY, NOT NULL | Referência à role |
+| `permissionId` | UUID | FOREIGN KEY, NOT NULL | Referência à permission |
+| `createdAt` | TIMESTAMP | NOT NULL | Data de vínculo |
+
+**Constraints:**
+- `UNIQUE(roleId, permissionId)` - evita duplicatas
+- `FK_role_permissions_roleId` → `roles.id` ON DELETE CASCADE
+- `FK_role_permissions_permissionId` → `permissions.id` ON DELETE CASCADE
 
 ---
 
@@ -546,15 +606,17 @@ CREATE INDEX idx_products_salon ON products(salonId);
 
 1. **Migration 1**: Atualizar tabela `users` (adicionar `phone`, `globalRole`)
 2. **Migration 2**: Criar tabela `roles` com seed de papéis padrão
-3. **Migration 3**: Criar tabela `salons`
-4. **Migration 4**: Criar tabela `user_salon_roles`
-5. **Migration 5**: Criar tabelas `services` e `products`
-6. **Migration 6**: Criar tabela `appointments`
-7. **Migration 7**: Criar tabelas `appointment_services` e `appointment_products`
-8. **Migration 8**: Criar tabela `messages`
+3. **Migration 3**: Criar tabelas `permissions` e `role_permissions` (seed de permissões canônicas)
+4. **Migration 4**: Criar tabela `salons`
+5. **Migration 5**: Criar tabela `user_salon_roles`
+6. **Migration 6**: Criar tabelas `services` e `products`
+7. **Migration 7**: Criar tabela `appointments`
+8. **Migration 8**: Criar tabelas `appointment_services` e `appointment_products`
+9. **Migration 9**: Criar tabela `messages`
+10. **Migration 10**: Criar tabela `refresh_tokens` (separada ou incluída conforme histórico de deploy)
 
 ---
 
 **📅 Última atualização:** 10/11/2025  
 **📌 Versão:** 2.0.0  
-**🗄️ Total de tabelas:** 11 tabelas
+**🗄️ Total de tabelas:** 13 tabelas
