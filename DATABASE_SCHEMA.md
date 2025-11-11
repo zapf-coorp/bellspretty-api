@@ -41,7 +41,7 @@ erDiagram
         string email UK
         string password
         string phone
-        enum globalRole "super_admin, user"
+        enum globalRole
         boolean isActive
         timestamp createdAt
         timestamp updatedAt
@@ -49,7 +49,7 @@ erDiagram
     
     ROLES {
         uuid id PK
-        string name UK "owner, admin, worker, client"
+        string name UK
         string description
         timestamp createdAt
     }
@@ -74,7 +74,6 @@ erDiagram
         uuid userId FK
         uuid salonId FK
         uuid roleId FK
-        boolean isActive
         timestamp createdAt
     }
 
@@ -85,7 +84,7 @@ erDiagram
         uuid id PK
         string name UK
         string description
-        enum scope "global, salon"
+        enum scope
         timestamp createdAt
         timestamp updatedAt
     }
@@ -94,6 +93,16 @@ erDiagram
         uuid id PK
         uuid roleId FK
         uuid permissionId FK
+        timestamp createdAt
+    }
+
+    ROLES ||--o{ SERVICE_ROLES : "qualifies"
+    SERVICES ||--o{ SERVICE_ROLES : "requires"
+
+    SERVICE_ROLES {
+        uuid id PK
+        uuid serviceId FK
+        uuid roleId FK
         timestamp createdAt
     }
     
@@ -105,6 +114,8 @@ erDiagram
         decimal price
         int durationMinutes
         boolean isActive
+        string imageUrl NULLABLE
+        uuid imageId NULLABLE
         timestamp createdAt
         timestamp updatedAt
     }
@@ -116,8 +127,11 @@ erDiagram
         string description
         string brand
         decimal price
+        string productCode UK NULLABLE
         int stockQuantity
         boolean isActive
+        string imageUrl NULLABLE
+        uuid imageId NULLABLE
         timestamp createdAt
         timestamp updatedAt
     }
@@ -130,11 +144,22 @@ erDiagram
         datetime scheduledAt
         int totalDurationMinutes
         decimal totalPrice
-        enum status "scheduled, confirmed, in_progress, completed, cancelled"
+        decimal totalCost
+        enum status
         text notes
         timestamp createdAt
         timestamp updatedAt
     }
+
+%% Notes on foreign keys & inventory
+%% Recommended FK policies:
+%%   * clientId: ON DELETE RESTRICT  -- keep history intact for reporting; change to SET NULL only if deleting clients is allowed and history can drop client linkage
+%%   * workerId: ON DELETE SET NULL  -- recommended so removing a worker doesn't block historical appointments; use RESTRICT if strict traceability is required
+
+%% Inventory & stock rules (operational guidance):
+%%   * Decrement product stock on a controlled status transition (example: when appointment.status transitions to 'confirmed' or 'in_progress').
+%%   * Rollback (increment) stock if appointment transitions to 'cancelled' (and only if stock was previously decremented for that appointment).
+%%   * Implement idempotent stock operations (mark appointment row with flag or record in journal when stock was applied) to avoid double-decrements.
     
     APPOINTMENT_SERVICES {
         uuid id PK
@@ -157,10 +182,12 @@ erDiagram
         uuid id PK
         uuid salonId FK
         uuid recipientId FK
-        enum type "whatsapp, email, sms, messenger"
+        string recipientEmail NULLABLE
+        string recipientPhone NULLABLE
+        enum type
         string subject
         text content
-        enum status "pending, sent, delivered, failed"
+        enum status
         json metadata
         datetime scheduledFor
         datetime sentAt
@@ -311,7 +338,6 @@ Tabela pivot que conecta usuários a salões com papéis específicos.
 | `userId` | UUID | FOREIGN KEY, NOT NULL | Referência ao usuário |
 | `salonId` | UUID | FOREIGN KEY, NOT NULL | Referência ao salão |
 | `roleId` | UUID | FOREIGN KEY, NOT NULL | Referência ao papel |
-| `isActive` | BOOLEAN | DEFAULT true | Status ativo/inativo |
 | `createdAt` | TIMESTAMP | NOT NULL | Data de vinculação |
 
 **Constraints:**
@@ -429,6 +455,8 @@ Todas as mensagens enviadas pelo sistema.
 | `id` | UUID | PRIMARY KEY | Identificador único |
 | `salonId` | UUID | FOREIGN KEY, NOT NULL | Salão que enviou |
 | `recipientId` | UUID | FOREIGN KEY, NOT NULL | Destinatário |
+| `recipientEmail` | VARCHAR(255) | NULLABLE | Email do destinatário (usar para leads/non-users) |
+| `recipientPhone` | VARCHAR(20) | NULLABLE | Telefone do destinatário (usar para leads/non-users) |
 | `type` | ENUM | NOT NULL | whatsapp, email, sms, messenger |
 | `subject` | VARCHAR(255) | NULLABLE | Assunto (email) |
 | `content` | TEXT | NOT NULL | Conteúdo da mensagem |
@@ -437,6 +465,11 @@ Todas as mensagens enviadas pelo sistema.
 | `scheduledFor` | DATETIME | NULLABLE | Agendamento de envio |
 | `sentAt` | DATETIME | NULLABLE | Data/hora do envio |
 | `createdAt` | TIMESTAMP | NOT NULL | Data de criação |
+
+**Validação de criação:** Ao criar uma mensagem, exigir que pelo menos um de `recipientId`, `recipientEmail` ou `recipientPhone` seja preenchido. Se `type` = 'email' exigir `recipientEmail` ou `recipientId` com email válido; se `type` = 'whatsapp' ou 'sms' exigir `recipientPhone` ou `recipientId` com phone válido.
+
+**Índices recomendados adicionais:**
+- `IDX_messages_recipient_contact` ON messages(recipientId, recipientEmail, recipientPhone) -- para buscas por contato/lead
 
 ---
 
@@ -501,7 +534,7 @@ JOIN user_salon_roles usr ON usr.salonId = s.id
 JOIN roles r ON r.id = usr.roleId
 JOIN users u ON u.id = usr.userId
 WHERE u.id = 'USER_ID_HERE' 
-  AND usr.isActive = true
+    AND u.isActive = true
   AND s.isActive = true;
 ```
 

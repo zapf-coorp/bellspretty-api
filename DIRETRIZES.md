@@ -151,21 +151,21 @@ Checklist para a tabela `permissions` e pivot `role_permissions`, que implementa
 
 ### A. Design e Especificação
 - [ ] Tabelas principais:
+- [ ] Tabelas principais:
   - `permissions`:
-  - `name` VARCHAR(100) NOT NULL
-    - `name` VARCHAR(150) UNIQUE NOT NULL (ex.: `appointments.create`, `salons.manage.settings`)
+    - `id` UUID PK
+    - `name` VARCHAR(150) UNIQUE NOT NULL  # ex.: `appointments.create`, `salons.manage.settings`
     - `description` TEXT NULLABLE
     - `scope` ENUM('global','salon') DEFAULT 'salon' # determina se a permissão precisa de contexto de salão
     - `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-    - `email` VARCHAR(255) NULLABLE
-    - `owner_user_id` UUID FK -> `users.id` NULLABLE  # vincula o salão ao usuário proprietário/criador principal (nullable para migração/remoção)
+    - `updated_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP
   - `role_permissions` (pivot):
     - `id` UUID PK
     - `role_id` UUID FK -> `roles.id`
     - `permission_id` UUID FK -> `permissions.id`
     - `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 - [ ] Constraints: `UNIQUE(role_id, permission_id)` para evitar duplicatas
- - [ ] Índices adicionais: `INDEX(owner_user_id)` para consultas rápidas por proprietário
+ - [ ] Índices adicionais: `INDEX(name)`, `INDEX(scope)` para consultas rápidas
 - [ ] Índices: `INDEX(name)`, `INDEX(scope)`, `INDEX(role_id)` para consultas rápidas
 
 ### B. TypeORM Entity + Mapping
@@ -265,6 +265,71 @@ Checklist para a tabela `salons`, a entidade central que representa cada salão 
 - [ ] Constraints: `UNIQUE(slug)`
 - [ ] Índices: `INDEX(is_active)`
 
+### BusinessHours DTO / Interface (padronização)
+
+O campo `business_hours` foi mantido como JSON para flexibilidade, mas recomendamos padronizar sua estrutura com um DTO/interface para evitar inconsistências entre frontend, jobs e integrações.
+
+Requisitos mínimos:
+- Deve representar todos os dias da semana (MONDAY..SUNDAY) ou permitir marcar dias como fechados.
+- Horários de abertura/fechamento devem seguir formato HH:MM (recomendado) ou ISO 8601 time (ex.: "09:00").
+- Cada item deve conter `day`, `isClosed` (boolean) e opcionalmente `open`/`close` quando `isClosed` for `false`.
+- Permitir exceções ou feriados via campo opcional `exceptions: { date: string, open?: string, close?: string, isClosed?: boolean }[]`.
+
+Exemplo JSON (array):
+
+```
+[
+  { "day": "MONDAY", "open": "09:00", "close": "18:00", "isClosed": false },
+  { "day": "SUNDAY", "isClosed": true }
+]
+```
+
+Sugestão de TypeScript (interface + class-validator DTO):
+
+```ts
+// src/modules/salons/dto/business-hours.dto.ts
+export type WeekDay = 'MONDAY'|'TUESDAY'|'WEDNESDAY'|'THURSDAY'|'FRIDAY'|'SATURDAY'|'SUNDAY';
+
+export interface BusinessHourItem {
+  day: WeekDay;
+  isClosed: boolean;
+  open?: string; // HH:MM
+  close?: string; // HH:MM
+}
+
+// Example Nest DTO using class-validator
+import { IsEnum, IsBoolean, IsOptional, Matches, IsArray, ValidateNested } from 'class-validator';
+import { Type } from 'class-transformer';
+
+export class BusinessHourItemDto {
+  @IsEnum(['MONDAY','TUESDAY','WEDNESDAY','THURSDAY','FRIDAY','SATURDAY','SUNDAY'])
+  day: WeekDay;
+
+  @IsBoolean()
+  isClosed: boolean;
+
+  @IsOptional()
+  @Matches(/^([01]\d|2[0-3]):([0-5]\d)$/)
+  open?: string;
+
+  @IsOptional()
+  @Matches(/^([01]\d|2[0-3]):([0-5]\d)$/)
+  close?: string;
+}
+
+export class BusinessHoursDto {
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => BusinessHourItemDto)
+  items: BusinessHourItemDto[];
+}
+```
+
+Implementation notes:
+- Validate in DTOs when creating/updating a `Salon`.
+- Consider storing the JSON as an array (normalized) and add a DB CHECK if your RDBMS supports JSON schema validation (Postgres JSONB + CHECK using jsonb_path_query) to enforce structure at DB layer for stronger guarantees.
+- Document the DTO path (`src/modules/salons/dto/business-hours.dto.ts`) and ensure frontend consumes/produces the same shape.
+
 ### B. TypeORM Entity + Mapping
 - [ ] Criar/validar `src/entities/salon.entity.ts`
 - [ ] Mapear relacionamentos:
@@ -334,7 +399,7 @@ Checklist para a tabela pivot `user_salon_roles`, que gerencia a relação entre
   - `user_id` UUID FK -> `users.id`
   - `salon_id` UUID FK -> `salons.id`
   - `role_id` UUID FK -> `roles.id`
-  - `is_active` BOOLEAN DEFAULT TRUE
+  - Nota: não inclua `is_active` na pivot `user_salon_roles`. O status de ativo do usuário deve ser determinado pelo campo `is_active` na tabela `users`. Para remover um papel prefira deletar o registro do pivot; se for necessário manter histórico, use `deleted_at` (soft-delete) na pivot.
   - `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP
   - `deleted_at` TIMESTAMP
 - [ ] Constraints: `UNIQUE(user_id, salon_id, role_id)` para evitar duplicidade
@@ -401,6 +466,9 @@ Checklist para a tabela `services`, que armazena os serviços oferecidos por cad
   - `price` DECIMAL(10,2) NOT NULL
   - `duration_minutes` INTEGER NOT NULL
   - `is_active` BOOLEAN DEFAULT TRUE
+  - `worker_role_ids` JSON NULLABLE OR pivot `service_roles` (recommended: pivot)
+  - `image_url` VARCHAR(255) NULLABLE  # URL pública para catálogo/preview (opcional)
+  - `image_id` UUID NULLABLE           # referência a serviço/asset de mídia (opcional)
   - `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP
   - `updated_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP
   - `deleted_at` TIMESTAMP
@@ -411,10 +479,15 @@ Checklist para a tabela `services`, que armazena os serviços oferecidos por cad
 - [ ] Criar/validar `src/entities/service.entity.ts` com colunas em snake_case
 - [ ] Mapear `ManyToOne` -> `Salon` e `OneToMany` -> `AppointmentService` (pivot)
 - [ ] Aplicar validações/transformers: garantir arredondamento de `price`, tamanho máximo de `name`
+ - [ ] Mapear relação com `Role` para indicar quais roles podem executar o serviço:
+   - Preferência: criar entidade pivot `ServiceRole` (`service_roles`) com `serviceId` + `roleId` e `UNIQUE(serviceId, roleId)`.
+   - Alternativa compacta: `worker_role_ids` JSON column contendo array de UUIDs (menos queryable, evita FK).
+ - [ ] Expor helper `Service.getAllowedRoleIds(): string[]` e `Service.isRoleAllowed(roleId)` para validações de agendamento
 
 ### C. Migrations
 - [ ] Gerar migration: `npm run migration:generate -- --name=CreateServices` e revisar SQL
 - [ ] Garantir que a migration crie FK `salon_id` com `ON DELETE CASCADE` e índices recomendados
+ - [ ] Gerar migration para `service_roles` (quando usar pivot): `CreateServiceRoles` com FK `serviceId -> services.id` ON DELETE CASCADE, `roleId -> roles.id` ON DELETE RESTRICT, e `UNIQUE(serviceId, roleId)`; índice em `roleId` para filtragem por worker
 
 ### D. Seeds e Dados de Desenvolvimento
 - [ ] Criar seed com serviços comuns de exemplo (ex.: Corte, Escova, Manicure) para `salon_default`
@@ -439,6 +512,10 @@ Checklist para a tabela `services`, que armazena os serviços oferecidos por cad
 - [ ] Ao criar um serviço, calcular e armazenar `duration_minutes` como inteiro
 - [ ] Ao atualizar preço/duração, manter histórico via `appointment_services` (já presente) — não alterar registros históricos
 - [ ] Permitir múltiplos serviços com mesmo nome em salões diferentes, mas evitar duplicatas no mesmo salão
+ - [ ] Validação de agendamento: ao atribuir `worker_id` a um agendamento, garantir que o worker tenha um role (em `user_salon_roles`) que esteja listado em `service_roles` para o serviço solicitado. Fast-paths:
+   - Se `salon.owner_user_id === worker_id` owner pode executar todos serviços
+   - Caso contrário checar `user_salon_roles` para obter roleId do worker no salão e validar via `service_roles`
+ - [ ] Endpoint para listar serviços que um worker pode executar: JOIN `service_roles` ON `serviceId` WHERE `roleId` IN (worker_role_ids_of_user)
 
 ### H. Tests
 - [ ] Unit tests para `ServicesService` (criar, atualizar, listar, desativar)
@@ -470,6 +547,9 @@ Checklist para a tabela `products`, que armazena os produtos vendidos ou utiliza
   - `price` DECIMAL(10,2) NOT NULL
   - `stock_quantity` INTEGER DEFAULT 0
   - `is_active` BOOLEAN DEFAULT TRUE
+  - `product_code` VARCHAR(50) NULLABLE UNIQUE  # SKU / código de barras (opcional)
+  - `image_url` VARCHAR(255) NULLABLE
+  - `image_id` UUID NULLABLE
   - `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP
   - `updated_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP
   - `deleted_at` TIMESTAMP
@@ -566,6 +646,8 @@ Checklist para a tabela `appointments`, que gerencia os agendamentos de serviço
 - [ ] Gerar migration: `npm run migration:generate -- --name=CreateAppointments` e revisar SQL
 - [ ] Garantir FKs com `ON DELETE CASCADE` para `salon_id`, `ON DELETE SET NULL` para `worker_id`, `ON DELETE RESTRICT` para `client_id`
 - [ ] Criar índices compostos para otimizar queries de listagem por salão e data
+ - [ ] Migration: adicionar coluna `total_cost` DECIMAL(10,2) NOT NULL em `appointments` para registrar custo (salário, custo de produtos) por agendamento. Implementar up/down idempotentes.
+ - [ ] Migration: incluir mecanismo/journal para marcar quando o estoque foi decrementado para um agendamento (ex.: `stock_applied_at` timestamp ou tabela `appointment_stock_journal`) a fim de tornar operações de rollback seguras e idempotentes.
 
 ### D. Seeds e Dados de Desenvolvimento
 - [ ] Criar seed com agendamentos de exemplo para `salon_default` (passados e futuros)
@@ -597,12 +679,27 @@ Checklist para a tabela `appointments`, que gerencia os agendamentos de serviço
 - [ ] Transições de status válidas: `scheduled` → `confirmed` → `in_progress` → `completed` ou `cancelled`
 - [ ] Enviar notificações automáticas (email/WhatsApp) ao criar/atualizar agendamento
 - [ ] Decrementar estoque de produtos ao confirmar/completar agendamento
+ - [ ] Registrar `total_cost` para cada `appointment` que soma custos diretos (ex.: salário do trabalhador estimado, custo dos produtos usados) — usar DECIMAL(10,2) em `appointments.total_cost`.
+ - [ ] Controle de estoque atrelado a transições de status:
+   - Decrementar estoque apenas em uma transição autorizada (ex.: `scheduled` -> `confirmed` ou `confirmed` -> `in_progress`).
+   - Marcar explicitamente que o estoque foi aplicado (timestamp ou journal) para permitir rollback seguro.
+   - Ao transitar para `cancelled`, reverter o estoque apenas se a operação de decremento tiver sido aplicada antes.
+   - Garantir operações idempotentes (evitar duplo decremento/rollback em casos de retries).
+ - [ ] FK deletion policy reminder:
+   - `client_id`: prefer `ON DELETE RESTRICT` para preservar histórico; only change to `SET NULL` if deletion of clients and loss of linkage is acceptable.
+   - `worker_id`: `ON DELETE SET NULL` is recommended so removing workers doesn't break historical appointment records; use `RESTRICT` when strict traceability is required.
 
 ### H. Tests
 - [ ] Unit tests para `AppointmentsService` (criar, calcular totais, validar disponibilidade, atualizar status)
 - [ ] E2E tests para endpoints CRUD e transições de status
 - [ ] Testar validações: agendamento no passado, horário fora do expediente, conflito de horário
 - [ ] Testar permissões: client só vê/edita seus próprios agendamentos
+ - [ ] Testar `total_cost` persistência: criar agendamento com serviços/produtos e validar `total_cost` calculado e salvo.
+ - [ ] Testar estoque ligado a status transitions:
+   - Simular criação → confirmar: verificar decremento de estoque correto e marcação de `stock_applied`.
+   - Simular confirmar → cancelar: verificar rollback/incremento somente se `stock_applied` estava setado.
+   - Testar idempotência: re-executar handlers/jobs e verificar que não há dupla alteração de estoque.
+ - [ ] Testar FK deletion policies in dev migrations (attempt to delete client/worker when RESTRICT/SET NULL) and ensure application behavior matches expectations.
 
 ### I. Documentação e Swagger
 - [ ] Documentar endpoints de `Appointments` com `@ApiTags('Appointments')`
@@ -785,6 +882,8 @@ Checklist para a tabela `messages`, que armazena o histórico de mensagens envia
   - `id` UUID PK
   - `salon_id` UUID FK -> `salons.id`
   - `recipient_id` UUID FK -> `users.id`
+  - `recipient_email` VARCHAR(255) NULLABLE  # allow sending to leads / non-users
+  - `recipient_phone` VARCHAR(20) NULLABLE   # allow sending to leads by phone number
   - `type` ENUM('whatsapp','email','sms','messenger') NOT NULL
   - `subject` VARCHAR(255) NULLABLE (apenas para email)
   - `content` TEXT NOT NULL
@@ -813,12 +912,18 @@ Checklist para a tabela `messages`, que armazena o histórico de mensagens envia
 - [ ] Criar seed com mensagens de exemplo para `salon_default` (pendentes, enviadas, falhadas)
 - [ ] Adicionar em `docs/seeds/seed_messages.sql` ou `scripts/seed-messages.ts` (idempotente)
 
-### E. DTOs e Validações
-- [ ] `src/modules/messages/dto/create-message.dto.ts` — `salonId`, `recipientId`, `type`, `subject?`, `content`, `scheduledFor?`, `metadata?`
+-### E. DTOs e Validações
+- [ ] `src/modules/messages/dto/create-message.dto.ts` — `salonId`, `recipientId?`, `recipientEmail?`, `recipientPhone?`, `type`, `subject?`, `content`, `scheduledFor?`, `metadata?`
 - [ ] `src/modules/messages/dto/update-message-status.dto.ts` — `status`, `sentAt?`, `metadata?` (para atualizar após envio)
 - [ ] `src/modules/messages/dto/list-messages.dto.ts` — `page`, `limit`, `status?`, `type?`, `dateFrom?`, `dateTo?`, `recipientId?`
 - [ ] `src/modules/messages/dto/send-bulk-message.dto.ts` — `salonId`, `recipientIds[]`, `type`, `content`, `subject?`, `scheduledFor?`
 - [ ] Validations: `IsUUID`, `IsEnum`, `IsString`, `IsDateString`, `IsOptional`, `MaxLength(255)` para `subject`
+
+  - Validation rules to enforce in DTOs/service:
+    - Require at least one of `recipientId` OR `recipientEmail` OR `recipientPhone` on create.
+    - When `type = 'email'` ensure `recipientEmail` is present and is a valid email.
+    - When `type = 'whatsapp'` or `type = 'sms'` ensure `recipientPhone` is present and is a valid phone (E.164 preferred).
+    - If `recipientId` is provided, validate the referenced user has the needed contact info or allow fallback to explicit email/phone provided in the DTO.
 
 ### F. Service, Controller e Endpoints
 - [ ] Criar `MessagesModule`, `MessagesService`, `MessagesController`
@@ -845,6 +950,10 @@ Checklist para a tabela `messages`, que armazena o histórico de mensagens envia
 - [ ] Unit tests para `MessagesService` (criar, agendar, processar fila, atualizar status)
 - [ ] E2E tests para endpoints CRUD e envio em massa
 - [ ] Testar validações: tipo inválido, destinatário sem contato, agendamento no passado
+- [ ] Testar validações específicas de destinatário:
+  - criar mensagem sem `recipientId`/`recipientEmail`/`recipientPhone` deve falhar (400)
+  - criar mensagem com `type = 'email'` e `recipientEmail` inválido deve falhar
+  - criar mensagem com `type = 'whatsapp'|'sms'` e `recipientPhone` inválido deve falhar
 - [ ] Testar job de processamento de mensagens pendentes/agendadas
 - [ ] Testar retry logic para mensagens falhadas
 - [ ] Mock de provedores externos (WhatsApp, Email, SMS) para testes isolados

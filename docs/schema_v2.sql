@@ -76,7 +76,6 @@ CREATE TABLE user_salon_roles (
     user_id VARCHAR(36) NOT NULL,
     salon_id VARCHAR(36) NOT NULL,
     role_id VARCHAR(36) NOT NULL,
-    is_active BOOLEAN DEFAULT TRUE,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     
     FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
@@ -88,7 +87,7 @@ CREATE TABLE user_salon_roles (
 
 CREATE INDEX idx_usr_user_salon ON user_salon_roles(user_id, salon_id);
 CREATE INDEX idx_usr_salon_role ON user_salon_roles(salon_id, role_id);
-CREATE INDEX idx_usr_active ON user_salon_roles(is_active);
+
 
 -- =====================================================
 -- TABLE: services
@@ -111,6 +110,26 @@ CREATE TABLE services (
 
 CREATE INDEX idx_services_salon ON services(salon_id);
 CREATE INDEX idx_services_active ON services(is_active);
+
+-- =====================================================
+-- TABLE: service_roles
+-- Description: Which roles (worker types) are qualified to perform each service
+-- =====================================================
+
+CREATE TABLE service_roles (
+    id VARCHAR(36) PRIMARY KEY,
+    service_id VARCHAR(36) NOT NULL,
+    role_id VARCHAR(36) NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+
+    FOREIGN KEY (service_id) REFERENCES services(id) ON DELETE CASCADE,
+    FOREIGN KEY (role_id) REFERENCES roles(id) ON DELETE RESTRICT,
+
+    UNIQUE(service_id, role_id)
+);
+
+CREATE INDEX idx_service_roles_service ON service_roles(service_id);
+CREATE INDEX idx_service_roles_role ON service_roles(role_id);
 
 -- =====================================================
 -- TABLE: products
@@ -254,7 +273,6 @@ CREATE INDEX idx_refresh_tokens_expires ON refresh_tokens(expires_at);
 -- VIEWS
 -- =====================================================
 
--- View: User salons with roles
 CREATE VIEW v_user_salons AS
 SELECT 
     u.id as user_id,
@@ -263,16 +281,15 @@ SELECT
     s.id as salon_id,
     s.name as salon_name,
     r.name as role_name,
-    usr.is_active as is_active_in_salon
+        u.is_active as is_active_in_salon
 FROM users u
 JOIN user_salon_roles usr ON usr.user_id = u.id
 JOIN salons s ON s.id = usr.salon_id
 JOIN roles r ON r.id = usr.role_id
-WHERE usr.is_active = TRUE 
+WHERE u.is_active = TRUE 
   AND s.is_active = TRUE
   AND u.is_active = TRUE;
 
--- View: Appointment summary
 CREATE VIEW v_appointment_summary AS
 SELECT 
     a.id,
@@ -295,15 +312,8 @@ LEFT JOIN appointment_services aps ON aps.appointment_id = a.id
 LEFT JOIN services serv ON serv.id = aps.service_id
 GROUP BY a.id;
 
--- =====================================================
--- USEFUL QUERIES (commented)
--- =====================================================
 
--- Get all salons where user has owner role
--- SELECT s.* FROM salons s
--- JOIN user_salon_roles usr ON usr.salon_id = s.id
--- JOIN roles r ON r.id = usr.role_id
--- WHERE usr.user_id = 'USER_ID' AND r.name = 'owner' AND usr.is_active = TRUE;
+-- WHERE usr.user_id = 'USER_ID' AND r.name = 'owner' AND u.is_active = TRUE;
 
 -- Client history at specific salon
 -- SELECT * FROM v_appointment_summary
